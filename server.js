@@ -1550,7 +1550,7 @@ async function resolveRecipientEmails(tasks, contextBody, embeddedEmails = []) {
 // Model tiers — Sonnet for fast/simple calls (saves cost), Opus for complex reasoning
 const MODEL_HAIKU   = "claude-haiku-4-5-20251001"; // binary classifications, name extraction, short JSON, one-liners
 const MODEL_FAST    = "claude-sonnet-4-6";          // short emails, slot proposals, summaries, scheduling
-const MODEL_CAPABLE = "claude-opus-4-5";            // full drafts, CRM enrichment, instruction parsing, reasoning
+const MODEL_CAPABLE = "claude-opus-4-6";            // full drafts, CRM enrichment, instruction parsing, reasoning
 const CLAUDE_TIMEOUT_MS = 55_000; // 55s — generous but bounded
 
 async function askClaude(prompt, maxTokens = 1024, retries = 2, model = MODEL_CAPABLE) {

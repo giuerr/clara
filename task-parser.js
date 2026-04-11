@@ -22,7 +22,7 @@ const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Level
 // ─── Model tiers ──────────────────────────────────────────────────────────────
 const MODEL_HAIKU   = "claude-haiku-4-5-20251001";
 const MODEL_FAST    = "claude-sonnet-4-6";
-const MODEL_CAPABLE = "claude-opus-4-5";
+const MODEL_CAPABLE = "claude-opus-4-6";
 const CLAUDE_TIMEOUT_MS = 55_000;
 
 // ─── Anthropic singleton ──────────────────────────────────────────────────────
