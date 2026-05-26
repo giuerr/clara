@@ -6,6 +6,15 @@ Operations Lead for Tabularum. Owns CRM, communications, scheduling and operatio
 - **Entry:** [`index.js`](./index.js)
 - **Persona spec:** [`instructions.txt`](./instructions.txt)
 
+## Three layers
+
+| Layer | Location |
+|---|---|
+| **Core** (this folder) | [`agents/clara/`](.) — agent card, CRM engine, adapters |
+| **Backend HTTP** | [`backend/src/agents/clara/`](../../backend/src/agents/clara) — `route.js`, HR functions, onboarding chat, receipt processor |
+| **Frontend page** | [`frontend/tabularum-clara.html`](../../frontend/tabularum-clara.html) |
+| **Frontend JS** | [`frontend/js/pages/clara.js`](../../frontend/js/pages/clara.js) |
+
 ## Capabilities
 
 - **CRM** — contact/profile memory, deal tracking, follow-up scheduling ([`crm-engine.js`](./crm-engine.js), [`follow-up.js`](./follow-up.js))
