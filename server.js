@@ -22,7 +22,7 @@ const fs   = require("fs");
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, LevelFormat, BorderStyle } = require("docx");
 
 // ─── Module imports ──────────────────────────────────────────────────────────
-const { createInstitutionalCore } = require("../institutional-core");
+const { createInstitutionalCore } = require("../../packages/institutional-core");
 const gmailAdapter     = require("./gmail-adapter");
 const calendarAdapter  = require("./calendar-adapter");
 const telegramHandler  = require("./telegram-handler");
