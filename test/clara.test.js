@@ -94,3 +94,111 @@ test('conversation state transitions only produce defined states', () => {
     }
   }
 });
+
+// ── Data room operations ────────────────────────────────────────────────────
+
+test('a room plan is produced for every supported deal type', () => {
+  const { DEAL_TYPES, buildRoomPlan } = clara.dataroom;
+  assert.ok(DEAL_TYPES.length >= 3);
+
+  for (const dealType of DEAL_TYPES) {
+    const plan = buildRoomPlan({ dealType });
+    assert.ok(plan.folders.length > 0, `${dealType} has no folders`);
+    assert.ok(plan.totalDocuments > 0, `${dealType} requires no documents`);
+    assert.ok(plan.criticalDocuments > 0, `${dealType} has no critical documents`);
+    assert.ok(plan.criticalDocuments <= plan.totalDocuments);
+  }
+});
+
+test('an unknown deal type is rejected', () => {
+  assert.throws(() => clara.dataroom.buildRoomPlan({ dealType: 'ipo' }), /Unknown dealType/);
+});
+
+test('an empty room is 0% complete and not launch-ready', () => {
+  const { buildRoomPlan, assessReadiness } = clara.dataroom;
+  const plan = buildRoomPlan({ dealType: 'fund_raise' });
+  const a = assessReadiness(plan, []);
+
+  assert.equal(a.completeness, 0);
+  assert.equal(a.launchReady, false);
+  assert.equal(a.missing.length, plan.totalDocuments);
+  assert.equal(a.missingCritical.length, plan.criticalDocuments);
+});
+
+test('a fully stocked room is 100% complete and launch-ready', () => {
+  const { buildRoomPlan, assessReadiness } = clara.dataroom;
+  const plan = buildRoomPlan({ dealType: 'fund_raise' });
+  const everything = plan.folders.flatMap(f => f.documents.map(d => d.name));
+
+  const a = assessReadiness(plan, everything);
+  assert.equal(a.completeness, 100);
+  assert.equal(a.launchReady, true);
+  assert.deepEqual(a.missing, []);
+});
+
+test('launch readiness turns on critical documents, not total count', () => {
+  const { buildRoomPlan, assessReadiness } = clara.dataroom;
+  const plan = buildRoomPlan({ dealType: 'fund_raise' });
+  const criticalOnly = plan.folders.flatMap(f => f.documents.filter(d => d.critical).map(d => d.name));
+
+  const a = assessReadiness(plan, criticalOnly);
+  assert.equal(a.launchReady, true, 'all critical documents present should allow launch');
+  assert.equal(a.criticalCompleteness, 100);
+  assert.ok(a.completeness < 100, 'non-critical documents are still outstanding');
+});
+
+test('document matching tolerates real-world filenames', () => {
+  const { documentPresent } = clara.dataroom;
+  assert.ok(documentPresent('Limited Partnership Agreement', ['LPA - Limited Partnership Agreement v3 FINAL.pdf']));
+  assert.ok(documentPresent('Audited Financials', ['audited_financials_2025.xlsx']));
+  assert.equal(documentPresent('Compliance Manual', ['Cap Table.xlsx']), false);
+});
+
+test('next actions put blocking items first and clear when ready', () => {
+  const { buildRoomPlan, assessReadiness, nextActions } = clara.dataroom;
+  const plan = buildRoomPlan({ dealType: 'ma_sell_side' });
+
+  const actions = nextActions(assessReadiness(plan, []));
+  assert.equal(actions[0].priority, 'blocking');
+  const firstStandard = actions.findIndex(a => a.priority === 'standard');
+  const lastBlocking = actions.map(a => a.priority).lastIndexOf('blocking');
+  if (firstStandard !== -1) assert.ok(lastBlocking < firstStandard, 'blocking items must precede standard ones');
+
+  const everything = plan.folders.flatMap(f => f.documents.map(d => d.name));
+  const ready = nextActions(assessReadiness(plan, everything));
+  assert.equal(ready[0].priority, 'ready');
+});
+
+test('access widens with counterparty role and never leaks past internal', () => {
+  const { buildRoomPlan, accessMatrix, ROLES } = clara.dataroom;
+  const plan = buildRoomPlan({ dealType: 'ma_sell_side' });
+
+  const counts = ROLES.map(r => accessMatrix(plan, r).visibleFolders.length);
+  const [prospect, nda, diligence, internal] = counts;
+
+  assert.ok(prospect < nda, 'a prospect must see less than an NDA-signed counterparty');
+  assert.ok(nda <= diligence, 'diligence must see at least as much as post-NDA');
+  assert.equal(internal, plan.folders.length, 'internal sees everything');
+  assert.equal(accessMatrix(plan, 'prospect').ndaRequired, false);
+  assert.equal(accessMatrix(plan, 'diligence').ndaRequired, true);
+  assert.throws(() => accessMatrix(plan, 'journalist'), /Unknown role/);
+});
+
+test('abbreviated filenames satisfy their full document name', () => {
+  const { documentPresent } = clara.dataroom;
+  assert.ok(documentPresent('Private Placement Memorandum', ['PPM_2026.pdf']));
+  assert.ok(documentPresent('Quality of Earnings', ['QoE report.pdf']));
+  assert.ok(documentPresent('Cap Table', ['capitalisation table.xlsx']));
+  // Abbreviations match as whole words only — 'coi' must not hit 'coinvestment'.
+  assert.equal(documentPresent('Certificate of Formation', ['coinvestment terms.pdf']), false);
+});
+
+test('every alias key names a document that actually exists in a structure', () => {
+  const { ALIASES, STRUCTURES } = clara.dataroom;
+  const known = new Set(
+    Object.values(STRUCTURES).flat()
+      .flatMap(f => f.documents.map(d => d.name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim())),
+  );
+  const orphans = Object.keys(ALIASES).filter(k => !known.has(k));
+  assert.deepEqual(orphans, [], `aliases for documents no structure requires: ${orphans.join(', ')}`);
+});

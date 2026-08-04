@@ -14,15 +14,14 @@ const AGENT_CARD = {
   },
   // Capabilities and endpoints are kept in step: the card is a
   // machine-readable contract, so advertising a capability with nothing behind
-  // it is a defect. 'dataroom' was previously listed here with no endpoint and
-  // no implementation on either the standalone service or the Tabularum mount,
-  // and has been dropped until one exists.
+  // it is a defect.
   capabilities: [
     'chat',
     'calendar',
     'outreach',
     'onboarding',
     'crm',
+    'dataroom',
     'compliance-calendar',
     'hr',
     'receipts',
@@ -37,6 +36,7 @@ const AGENT_CARD = {
     outreach:             '/api/outreach',
     onboarding:           '/clara/onboarding',
     crm:                  '/clara/crm',
+    dataroom:             '/clara/dataroom',
     complianceCalendar:   '/clara/compliance-calendar',
     hr:                   '/clara/hr',
     receipts:             '/clara/receipts/process',
@@ -72,6 +72,7 @@ module.exports = {
   hrFunctions:      require('./hr-functions'),
   onboardingChat:   require('./onboarding-chat'),
   receiptProcessor: require('./receipt-processor'),
+  dataroom:         require('./dataroom'),
 
   // Deferred: these touch the filesystem, Google APIs or the Anthropic SDK on
   // load, which a consumer importing only the agent card should not pay for.
