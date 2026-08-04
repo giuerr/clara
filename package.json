@@ -5,7 +5,9 @@
   "main": "index.js",
   "license": "UNLICENSED",
   "private": true,
-  "engines": { "node": ">=18.0.0" },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node --max-old-space-size=460 server.js",
     "test": "node --test test/*.test.js",
@@ -13,7 +15,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
-    "@tabularum/institutional-core": "^1.0.0",
     "cors": "^2.8.5",
     "docx": "^9.6.1",
     "dotenv": "^16.4.5",

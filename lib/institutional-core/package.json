@@ -1,0 +1,15 @@
+{
+  "name": "@tabularum/institutional-core",
+  "version": "1.0.0",
+  "description": "Shared institutional-grade infrastructure for Antoninus agent stack: confidence scoring, citation tracking, persistent audit trails, human approval gates, output versioning, scope guards, and data isolation.",
+  "main": "index.js",
+  "author": "Antoninus Global SPC",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "node institutional-core.test.js"
+  }
+}
