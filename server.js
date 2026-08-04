@@ -22,7 +22,7 @@ const fs   = require("fs");
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, LevelFormat, BorderStyle } = require("docx");
 
 // ─── Module imports ──────────────────────────────────────────────────────────
-const { createInstitutionalCore } = require("../../packages/institutional-core");
+const { createInstitutionalCore } = require('@tabularum/institutional-core');
 const gmailAdapter     = require("./gmail-adapter");
 const calendarAdapter  = require("./calendar-adapter");
 const telegramHandler  = require("./telegram-handler");
@@ -6372,35 +6372,41 @@ app.use((err, req, res, next) => {
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  addLog(`🌿 Clara v6 started on port ${PORT}`, "success");
-  addLog(freshDeploy ? `🔄 Fresh deploy — stale state wiped` : `♻️ Same deploy — state preserved`, freshDeploy ? "warning" : "info");
-  addLog(`💾 Data directory: ${DATA_DIR}`, "info");
-  if (persistentRules.length) addLog(`🧠 ${persistentRules.length} persistent rule(s) loaded`, "info");
+// Only listen when run directly, so the app can be imported for tests
+// or mounted by a host process without binding a port.
+if (require.main === module) {
+  app.listen(PORT, () => {
+    addLog(`🌿 Clara v6 started on port ${PORT}`, "success");
+    addLog(freshDeploy ? `🔄 Fresh deploy — stale state wiped` : `♻️ Same deploy — state preserved`, freshDeploy ? "warning" : "info");
+    addLog(`💾 Data directory: ${DATA_DIR}`, "info");
+    if (persistentRules.length) addLog(`🧠 ${persistentRules.length} persistent rule(s) loaded`, "info");
 
-  // Auto-register Telegram webhook on startup
-  if (TELEGRAM_ENABLED) {
-    const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.BASE_URL || `http://localhost:${PORT}`;
-    const webhookUrl = `${baseUrl}${TELEGRAM_WEBHOOK_PATH}`;
-    fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/setWebhook`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: webhookUrl, allowed_updates: ["message"] }),
-    }).then(r => r.json()).then(data => {
-      if (data.ok) addLog(`📱 Telegram webhook registered: ${webhookUrl}`, "success");
-      else addLog(`⚠️ Telegram webhook failed: ${data.description}`, "warning");
-    }).catch(e => addLog(`⚠️ Telegram webhook setup failed: ${e.message}`, "warning"));
-  }
+    // Auto-register Telegram webhook on startup
+    if (TELEGRAM_ENABLED) {
+      const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.BASE_URL || `http://localhost:${PORT}`;
+      const webhookUrl = `${baseUrl}${TELEGRAM_WEBHOOK_PATH}`;
+      fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/setWebhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: webhookUrl, allowed_updates: ["message"] }),
+      }).then(r => r.json()).then(data => {
+        if (data.ok) addLog(`📱 Telegram webhook registered: ${webhookUrl}`, "success");
+        else addLog(`⚠️ Telegram webhook failed: ${data.description}`, "warning");
+      }).catch(e => addLog(`⚠️ Telegram webhook setup failed: ${e.message}`, "warning"));
+    }
 
-  scheduleJobs();
-  if (config.isAuthorized && config.anthropicKey) {
-    addLog("🔑 All credentials found — starting polling automatically");
-    // Try Gmail push notifications first, fall back to polling
-    setupGmailPush().then(pushActive => {
-      startPolling(); // Always start polling (as backup if push is active)
-    });
-  } else {
-    if (!config.isAuthorized) addLog("⚠️ Google not authorized — visit /auth/login", "warning");
-    if (!config.anthropicKey) addLog("⚠️ Anthropic API key missing", "warning");
-  }
-});
+    scheduleJobs();
+    if (config.isAuthorized && config.anthropicKey) {
+      addLog("🔑 All credentials found — starting polling automatically");
+      // Try Gmail push notifications first, fall back to polling
+      setupGmailPush().then(pushActive => {
+        startPolling(); // Always start polling (as backup if push is active)
+      });
+    } else {
+      if (!config.isAuthorized) addLog("⚠️ Google not authorized — visit /auth/login", "warning");
+      if (!config.anthropicKey) addLog("⚠️ Anthropic API key missing", "warning");
+    }
+  });
+}
+
+module.exports = app;
