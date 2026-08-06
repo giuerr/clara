@@ -6441,9 +6441,25 @@ app.use((err, req, res, next) => {
   ];
   const missing = required.filter(v => !process.env[v.key] && !(v.alt && process.env[v.alt]));
   if (missing.length) {
-    console.error("\n❌ STARTUP FAILED — Missing required environment variables:\n");
-    missing.forEach(v => console.error(`   ${v.key}\n   → ${v.hint}\n`));
-    process.exit(1);
+    // Degrade rather than exit. Clara needs Google OAuth to read mail and move
+    // calendars, but nothing stops her reasoning, planning a data room or
+    // answering a question without it — and a process that dies on startup can
+    // do none of those. Exiting here also made Clara invisible to any harness
+    // that boots the agent in a clean sandbox: it saw a dead process, not a
+    // configuration problem, and reported the agent as unreachable.
+    //
+    // Set STRICT_ENV=1 to restore the hard failure where a half-configured
+    // deployment is worse than none.
+    const banner = missing.map(v => `   ${v.key}\n   → ${v.hint}`).join("\n");
+    if (process.env.STRICT_ENV === "1") {
+      console.error("\n❌ STARTUP FAILED — Missing required environment variables:\n");
+      console.error(banner);
+      process.exit(1);
+    }
+    console.warn("\n⚠️  LIMITED MODE — these are not set, so anything needing them is disabled:\n");
+    console.warn(banner);
+    console.warn("\n   Reasoning, planning and read-only tools still work: /health /chat /tools /task.");
+    console.warn("   Set STRICT_ENV=1 to fail startup instead.\n");
   }
   const missingOptional = optional.filter(v => !process.env[v.key]);
   if (missingOptional.length) {
