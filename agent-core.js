@@ -441,10 +441,38 @@ function mountAgent(app, {
 
   app.get('/tools', (_req, res) => json(res, 200, mind.manifest()));
 
+  /**
+   * Accept any of the shared secrets this agent might legitimately be given,
+   * and any of the headers a caller might legitimately send it in.
+   *
+   * AGENT_TASK_TOKEN is this surface's own token. DASHBOARD_PASSWORD is what
+   * Clara and Livia already authenticate their own routes with, and what an
+   * operator setting up an agent would naturally reuse. Agent Etna stores a
+   * per-agent password and presents it when it connects to a live agent, so
+   * accepting only a name it does not know would lock out the very harness
+   * this surface exists to serve.
+   *
+   * With none of them set the endpoints are open — which is what makes a
+   * zero-config sandbox work, and why any internet-reachable deployment
+   * should set one.
+   */
   function authorised(req) {
-    const required = process.env.AGENT_TASK_TOKEN;
-    if (!required) return true;
-    return String(req.headers.authorization || '').replace(/^Bearer\s+/i, '') === required;
+    const accepted = [
+      process.env.AGENT_TASK_TOKEN,
+      process.env.AGENT_PASSWORD,
+      process.env.DASHBOARD_PASSWORD,
+    ].filter(Boolean);
+    if (!accepted.length) return true;
+
+    const h = req.headers || {};
+    const supplied = [
+      String(h.authorization || '').replace(/^Bearer\s+/i, ''),
+      h['x-agent-password'],
+      h['x-api-key'],
+      (req.body && (req.body.password || req.body.token)),
+    ].filter(v => typeof v === 'string' && v);
+
+    return supplied.some(v => accepted.includes(v));
   }
 
   async function handle(req, res, { openaiShape }) {
