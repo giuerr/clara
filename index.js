@@ -85,3 +85,16 @@ module.exports = {
   /** The Express app, loaded on demand. */
   get app() { return require('./server'); },
 };
+
+// Run directly ("node index.js") → boot the server. Render's default start
+// command for this service points here rather than at server.js, and the
+// library entry silently finishing was read as a crashed deploy
+// ("Application exited early", 2026-08-06 — all four agents at once). The
+// guard makes both entrypoints correct instead of depending on which one
+// the platform was configured with. Placed after module.exports so the
+// server's own require('./index') sees fully-populated exports.
+if (require.main === module) {
+  const app = require('./server');
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => console.log('[boot] serving via index.js entrypoint on :' + PORT));
+}
