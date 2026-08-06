@@ -1,7 +1,7 @@
 {
   "name": "@tabularum/clara",
   "version": "6.0.0",
-  "description": "Clara — Operations Lead Agent",
+  "description": "Clara \u2014 Operations Lead Agent",
   "main": "index.js",
   "license": "UNLICENSED",
   "private": true,
@@ -15,11 +15,14 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
+    "@googleapis/calendar": "^9.8.0",
+    "@googleapis/gmail": "^12.0.0",
+    "@googleapis/people": "^3.0.9",
     "cors": "^2.8.5",
     "docx": "^9.6.1",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
-    "googleapis": "^171.4.0",
+    "google-auth-library": "^9.15.1",
     "pdf-parse": "^1.1.4"
   }
 }

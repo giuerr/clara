@@ -14,7 +14,7 @@
  * state, config, constants, and helper functions from the main server.
  */
 
-const { google } = require("googleapis");
+const { google } = require("./google-min");
 const fs = require("fs");
 const path = require("path");
 const cryptoStore = require("./crypto-store");
