@@ -5684,6 +5684,28 @@ app.get("/.well-known/agent.json", apiLimiter, (req, res) => {
 
 app.get("/api/status",  apiLimiter, requireAuth, (req, res) => res.json({ isPolling, isAuthorized: config.isAuthorized, pollIntervalMinutes: config.pollIntervalMinutes, hasApiKey: !!config.anthropicKey, processedCount: processedMessageIds.size, activeThreads: Object.keys(activeThreads).length }));
 app.get("/api/logs",    apiLimiter, requireAuth, (req, res) => res.json(logs));
+// ─── Test harness endpoint (Agent Etna) ─────────────────────────────────────
+// Clara's normal interface is Telegram + email — no chat endpoint — so a
+// developmental simulator can't drive it (2026-08-06, same gap the sibling
+// agents closed the same day). Exposes the persona + askClaude over the
+// standard {message} -> {reply} call ONLY when ETNA_AGENT_CHAT=1 (Agent
+// Etna injects this in its sandbox); unset in production, so this 404s and
+// never widens the real attack surface or burns the key.
+app.post("/api/chat", apiLimiter, async (req, res) => {
+  if (process.env.ETNA_AGENT_CHAT !== "1") return res.status(404).json({ error: "Not found" });
+  const message = req.body && (req.body.message || req.body.text);
+  if (!message || typeof message !== "string") return res.status(400).json({ error: "message required" });
+  if (!config.anthropicKey) return res.status(503).json({ error: "AI unavailable — no LLM key configured." });
+  try {
+    const persona = String(config.instructions || "");
+    const prompt = `${persona}\n\nYou are ${CLARA_NAME}, ${OWNER_NAME || "the owner"}'s executive assistant. Reply to the message below as you naturally would — concise and in your own voice.\n\nMessage:\n${ctx.wrapUntrusted(String(message).slice(0, 4000))}\n\nReply:`;
+    const reply = await ctx.askClaude(prompt, 600);
+    res.json({ reply: reply || "" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get("/api/threads", apiLimiter, requireAuth, (req, res) => res.json(activeThreads));
 
 // Delete a single thread
