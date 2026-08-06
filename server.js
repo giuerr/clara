@@ -112,6 +112,35 @@ app.use(cors({
 
 // ── Body-size limit: prevent oversized JSON payloads ─────────────────────
 app.use(express.json({ limit: "64kb" }));
+
+// ─── Reasoning core ───────────────────────────────────────────────────────────
+//
+// Everything below is a menu: endpoints that act only when a caller already
+// knows which one to call, and with exactly which body. This gives Clara the
+// other half — accept a goal, plan, call her own tools, and work it through.
+//
+// It also publishes the surface every agent shares, so one harness can drive
+// all of them:
+//
+//   GET  /health   GET /agent-card   GET /tools
+//   POST /task     POST /chat        POST /v1/chat/completions
+//
+// Mounted here, ahead of her own routes, because Express gives precedence to
+// whichever handler registered first and the point of these paths is that they
+// behave identically on every agent. The stricter, richer handlers below stay
+// reachable at their own paths.
+const { createMind, mountAgent } = require('./agent-core');
+const { TOOLS, SYSTEM_PROMPT } = require('./tools');
+
+const mind = createMind({
+  name:         'Clara',
+  systemPrompt: SYSTEM_PROMPT,
+  tools:        TOOLS,
+  logger:       (event, detail) => console.log(JSON.stringify({ _type: 'agent_core', event, ...detail })),
+});
+
+mountAgent(app, { mind, agentCard: () => AGENT_CARD });
+
 const PUBLIC_DIR = path.join(__dirname, "public");
 // ── Security headers ───────────────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -6406,6 +6435,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 // Only listen when run directly, so the app can be imported for tests
 // or mounted by a host process without binding a port.
+
 if (require.main === module) {
   app.listen(PORT, () => {
     addLog(`🌿 Clara v6 started on port ${PORT}`, "success");
