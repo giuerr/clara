@@ -413,7 +413,12 @@ function mountAgent(app, {
   mind,
   agentCard,
   extraHealth = () => ({}),
-  chatPaths = ['/chat', '/api/chat', '/v1/chat/completions'],
+  // /api/chat is deliberately NOT a default. Several agents already own that
+  // path — Livia with a Gmail-aware handler, Gaio and Lucio with harness
+  // adapters gated behind ETNA_AGENT_CHAT so they 404 in production. Claiming
+  // it here would shadow those and, worse, silently un-gate an endpoint whose
+  // author chose to gate it. Agents without such a handler can opt in.
+  chatPaths = ['/chat', '/v1/chat/completions'],
 }) {
   if (!app || typeof app.get !== 'function') throw new Error('mountAgent: an Express app is required');
   if (!mind) throw new Error('mountAgent: mind is required');
