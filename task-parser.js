@@ -17,6 +17,7 @@
  */
 
 const Anthropic  = require("@anthropic-ai/sdk");
+const { createLLMClient } = require("./llm-client");
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, LevelFormat, BorderStyle } = require("docx");
 
 // ─── Model tiers ──────────────────────────────────────────────────────────────
@@ -27,14 +28,30 @@ const CLAUDE_TIMEOUT_MS = 55_000;
 
 // ─── Anthropic singleton ──────────────────────────────────────────────────────
 let _anthropic = null;
+let _anthropicKey = null;
 function getAnthropic(apiKey) {
-  if (!_anthropic || _anthropic.apiKey !== apiKey) {
-    _anthropic = new Anthropic({ apiKey });
+  if (!_anthropic || _anthropicKey !== apiKey) {
+    _anthropic = createLLMClient({ apiKey });
+    _anthropicKey = apiKey;
   }
   return _anthropic;
 }
 
-function resetAnthropic() { _anthropic = null; }
+function resetAnthropic() { _anthropic = null; _anthropicKey = null; _searchClient = null; }
+
+// web_search_20250305 is a server-side tool: Anthropic runs the search itself
+// and there is no equivalent in the OpenAI-compatible shape OpenRouter serves.
+// Forwarding it would produce a function tool nothing executes — the model
+// would "call" it, get no result, and answer from memory while still appearing
+// to have searched. So this one capability keeps a direct Anthropic client
+// whenever an Anthropic key is available, and degrades openly when it is not.
+let _searchClient = null;
+function getWebSearchClient() {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return null;
+  if (!_searchClient) _searchClient = new Anthropic({ apiKey: key });
+  return _searchClient;
+}
 
 // ─── Injection guard ──────────────────────────────────────────────────────────
 function buildInjectionGuardSystem(CLARA_NAME) {
@@ -85,7 +102,16 @@ async function askClaude(ctx, prompt, maxTokens = 1024, retries = 2, model = MOD
 
 async function askClaudeWithWebSearch(ctx, prompt, { maxTokens = 4096, model = MODEL_CAPABLE } = {}) {
   const INJECTION_GUARD_SYSTEM = buildInjectionGuardSystem(ctx.CLARA_NAME);
-  const res = await getAnthropic(ctx.config.anthropicKey).messages.create({
+  const search = getWebSearchClient();
+  if (!search) {
+    ctx.addLog("⚠️ Web search unavailable — no ANTHROPIC_API_KEY. Answering without live results.", "warning");
+    return askClaude(
+      ctx,
+      `${prompt}\n\nNOTE: You have no web access for this request. Answer from what you already know and say plainly which parts you could not verify.`,
+      maxTokens, 2, model,
+    );
+  }
+  const res = await search.messages.create({
     model, max_tokens: maxTokens,
     system: INJECTION_GUARD_SYSTEM,
     tools: [{ type: "web_search_20250305", name: "web_search" }],

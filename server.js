@@ -17,6 +17,7 @@ const express  = require("express");
 const cors     = require("cors");
 const { google } = require("googleapis");
 const Anthropic  = require("@anthropic-ai/sdk");
+const { createLLMClient } = require("./llm-client");
 const path = require("path");
 const fs   = require("fs");
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, LevelFormat, BorderStyle } = require("docx");
@@ -246,7 +247,9 @@ function loadInstructions() {
 }
 
 const config = {
-  anthropicKey:        process.env.ANTHROPIC_API_KEY || "",
+  // The LLM credential. Named anthropicKey because the setup wizard and the
+  // /api/config contract use that name; the value may now be an OpenRouter key.
+  anthropicKey:        process.env.ANTHROPIC_API_KEY || process.env.OPENROUTER_API_KEY || "",
   pollIntervalMinutes: parseInt(process.env.POLL_INTERVAL || "1"),
   isAuthorized:        !!process.env.GOOGLE_REFRESH_TOKEN,
   _baseInstructions:   loadInstructions(),
@@ -367,13 +370,34 @@ async function withAuthCheck(fn) {
 const gmail    = google.gmail({ version: "v1", auth: oauth2Client });
 const calendar = google.calendar({ version: "v3", auth: calendarOAuth2Client });
 
-// ─── Anthropic singleton (rebuilt only when the API key changes) ──────────────
+// ─── LLM singleton (rebuilt only when the API key changes) ────────────────────
+//
+// OpenRouter when OPENROUTER_API_KEY is set, Anthropic direct otherwise. The
+// client speaks the Anthropic Messages shape either way, so the call sites
+// below are unchanged. The key is cached alongside the client because the
+// OpenRouter client exposes no .apiKey to compare against.
 let _anthropic = null;
+let _anthropicKey = null;
 function getAnthropic() {
-  if (!_anthropic || _anthropic.apiKey !== config.anthropicKey) {
-    _anthropic = new Anthropic({ apiKey: config.anthropicKey });
+  if (!_anthropic || _anthropicKey !== config.anthropicKey) {
+    _anthropic = createLLMClient({ apiKey: config.anthropicKey });
+    _anthropicKey = config.anthropicKey;
   }
   return _anthropic;
+}
+
+// web_search_20250305 is a server-side tool: Anthropic runs the search itself
+// and there is no equivalent in the OpenAI-compatible shape OpenRouter serves.
+// Forwarding it would produce a function tool nothing executes — the model
+// would "call" it, get no result, and answer from memory while still appearing
+// to have searched. So this one capability keeps a direct Anthropic client
+// whenever an Anthropic key is available, and degrades openly when it is not.
+let _searchClient = null;
+function getWebSearchClient() {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return null;
+  if (!_searchClient) _searchClient = new Anthropic({ apiKey: key });
+  return _searchClient;
 }
 
 // ─── State files ──────────────────────────────────────────────────────────────
@@ -1579,7 +1603,15 @@ async function askClaude(prompt, maxTokens = 1024, retries = 2, model = MODEL_CA
   }
 }
 async function askClaudeWithWebSearch(prompt, { maxTokens = 4096, model = MODEL_CAPABLE } = {}) {
-  const res = await getAnthropic().messages.create({
+  const search = getWebSearchClient();
+  if (!search) {
+    addLog("⚠️ Web search unavailable — no ANTHROPIC_API_KEY. Answering without live results.", "warning");
+    return askClaude(
+      `${prompt}\n\nNOTE: You have no web access for this request. Answer from what you already know and say plainly which parts you could not verify.`,
+      maxTokens, 2, model,
+    );
+  }
+  const res = await search.messages.create({
     model, max_tokens: maxTokens,
     system: INJECTION_GUARD_SYSTEM,
     tools: [{ type: "web_search_20250305", name: "web_search" }],
@@ -6335,7 +6367,7 @@ app.use((err, req, res, next) => {
 // Fail fast with a clear message rather than crashing mid-task
 (function validateEnv() {
   const required = [
-    { key: "ANTHROPIC_API_KEY",      hint: "Your Anthropic API key — get it from console.anthropic.com" },
+    { key: "OPENROUTER_API_KEY",     alt: "ANTHROPIC_API_KEY", hint: "Your OpenRouter API key — get it from openrouter.ai/keys (ANTHROPIC_API_KEY also accepted)" },
     { key: "GOOGLE_CLIENT_ID",       hint: "Google OAuth client ID — from Google Cloud Console" },
     { key: "GOOGLE_CLIENT_SECRET",   hint: "Google OAuth client secret — from Google Cloud Console" },
     { key: "GOOGLE_REFRESH_TOKEN",   hint: "Google refresh token — run /auth/login once to obtain it" },
@@ -6356,7 +6388,7 @@ app.use((err, req, res, next) => {
     { key: "TELEGRAM_BOT_TOKEN",        hint: "Telegram bot token from @BotFather — for two-way messaging with the owner" },
     { key: "TELEGRAM_CHAT_ID",         hint: "Owner's Telegram chat ID — auto-detected on first message, save it here for persistence" },
   ];
-  const missing = required.filter(v => !process.env[v.key]);
+  const missing = required.filter(v => !process.env[v.key] && !(v.alt && process.env[v.alt]));
   if (missing.length) {
     console.error("\n❌ STARTUP FAILED — Missing required environment variables:\n");
     missing.forEach(v => console.error(`   ${v.key}\n   → ${v.hint}\n`));
