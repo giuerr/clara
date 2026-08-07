@@ -17,11 +17,8 @@
       "server.js"
     ]
   },
-  "role": "",
-  "color": "#D9D9D9",
-  "ownerName": "Owner",
   "calibration": {
-    "purpose": "Operations Lead \u2014 data rooms, onboarding, HR operations and the day-to-day running of the firm",
+    "purpose": "Operations Lead — data rooms, onboarding, HR operations and the day-to-day running of the firm",
     "exampleAsks": [
       "What folder structure should a fund-raise data room have?",
       "Assess whether our data room is ready for diligence.",
@@ -47,5 +44,9 @@
       "onboarding_checklist",
       "list_leave_requests"
     ]
-  }
+  },
+  "calibrationConfirmed": false,
+  "role": "",
+  "color": "#D9D9D9",
+  "ownerName": "Owner"
 }
