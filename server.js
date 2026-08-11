@@ -208,6 +208,7 @@ const OWNER_DEFAULT    = process.env.OWNER_EMAIL || OWNER_EMAILS[0] || "";
 const OWNER_CALENDAR   = process.env.OWNER_CALENDAR_EMAIL || OWNER_DEFAULT;
 const OWNER_PHONE      = process.env.OWNER_PHONE || "";
 const OWNER_NAME       = process.env.OWNER_NAME || "the principal";
+const ORG_NAME         = process.env.ORG_NAME || "Tabularum";
 const CLARA_EMAIL      = process.env.CLARA_EMAIL || "";
 const CLARA_NAME       = process.env.CLARA_NAME || "Clara";
 const CLARA_SIGNATURE  = `Kind regards,\n\n${CLARA_NAME}\nOperations Lead to ${OWNER_NAME}`;
@@ -269,9 +270,23 @@ function isWithinActiveHours() {
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
+// instructions.txt ships with no owner details baked in — it refers to the
+// principal through {{OWNER_*}} tokens that are resolved here from the
+// environment, so the file itself stays free of personal data.
+const INSTRUCTION_TOKENS = {
+  OWNER_NAME:  () => OWNER_NAME,
+  OWNER_EMAIL: () => OWNER_DEFAULT || "(not configured)",
+  OWNER_PHONE: () => OWNER_PHONE   || "(no phone number configured)",
+};
+
+function resolveInstructionTokens(text) {
+  return text.replace(/\{\{(\w+)\}\}/g, (match, key) =>
+    Object.prototype.hasOwnProperty.call(INSTRUCTION_TOKENS, key) ? INSTRUCTION_TOKENS[key]() : match);
+}
+
 function loadInstructions() {
   const f = path.join(__dirname, "instructions.txt");
-  return fs.existsSync(f) ? fs.readFileSync(f, "utf-8").trim()
+  return fs.existsSync(f) ? resolveInstructionTokens(fs.readFileSync(f, "utf-8").trim())
     : `You are ${CLARA_NAME}, Operations Lead to ${OWNER_NAME}.`;
 }
 
@@ -5768,7 +5783,7 @@ app.post("/api/config", apiLimiter, requireAuth, (req, res) => {
   addLog("⚙️ Configuration updated", "success");
   res.json({ ok: true });
 });
-app.get("/api/config", apiLimiter, requireAuth, (req, res) => res.json({ isAuthorized: config.isAuthorized, hasApiKey: !!config.anthropicKey, pollIntervalMinutes: config.pollIntervalMinutes, claraEmail: CLARA_EMAIL, ownerEmail: OWNER_DEFAULT, instructions: config.instructions, vdrLink: config.vdrLink, vdrInfo: config.vdrInfo }));
+app.get("/api/config", apiLimiter, requireAuth, (req, res) => res.json({ isAuthorized: config.isAuthorized, hasApiKey: !!config.anthropicKey, pollIntervalMinutes: config.pollIntervalMinutes, claraEmail: CLARA_EMAIL, ownerEmail: OWNER_DEFAULT, ownerName: OWNER_NAME, orgName: ORG_NAME, instructions: config.instructions, vdrLink: config.vdrLink, vdrInfo: config.vdrInfo }));
 
 // ── Contacts: view and manually add/correct ─────────────────────────────────
 app.get("/api/contacts", apiLimiter, requireAuth, (req, res) => res.json(contacts));
@@ -6433,6 +6448,7 @@ app.use((err, req, res, next) => {
     { key: "DEPLOY_ID",              hint: "Increment this when you want a clean state wipe on redeploy" },
     { key: "OWNER_CALENDAR_EMAIL",   hint: "Owner's Google Calendar email — defaults to OWNER_EMAIL if not set" },
     { key: "OWNER_PHONE",            hint: "Owner's phone number with country code (e.g. +1234567890)" },
+    { key: "ORG_NAME",               hint: "Organisation name shown in the dashboard (defaults to Tabularum)" },
     { key: "CLARA_NAME",             hint: "The assistant's display name — defaults to Clara" },
     { key: "GOOGLE_CALENDAR_REFRESH_TOKEN", hint: "Owner's Google refresh token for Calendar — visit /auth/calendar-login to obtain it" },
     { key: "GOOGLE_CONTACTS_REFRESH_TOKEN", hint: "Google Contacts refresh token — visit /auth/contacts-login to sync CRM to iPhone" },
