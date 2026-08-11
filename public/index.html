@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Clara · the organisation</title>
+  <title>Clara</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
@@ -450,7 +450,7 @@
     <div class="login-laurel">SPQR</div>
     <div class="login-box">
       <h2>Clara</h2>
-      <p>the organisation</p>
+      <p id="login-org"></p>
       <div class="login-divider"></div>
       <input type="password" id="login-password" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()" style="text-align:center;letter-spacing:0.12em;margin-bottom:14px;"/>
       <button class="btn btn-gold" style="width:100%;justify-content:center;" onclick="doLogin()">Enter</button>
@@ -465,7 +465,7 @@
     <div class="h-monogram">L</div>
     <div>
       <div class="h-title">Clara</div>
-      <div class="h-sub">Operations Lead · the organisation</div>
+      <div class="h-sub" id="header-sub">Operations Lead</div>
     </div>
   </div>
   <div class="h-right">
@@ -493,7 +493,7 @@
 <div class="tab-panel active" id="tab-dashboard">
   <div id="auth-alert"></div>
   <div class="sect-head">
-    <h2 id="dash-greeting">Buongiorno, Owner</h2>
+    <h2 id="dash-greeting">Buongiorno</h2>
     <p id="dash-date" style="font-size:12px;color:var(--ink-soft);"></p>
   </div>
   <div class="sect-rule"></div>
@@ -939,15 +939,17 @@ function showTab(name,btn){
 }
 
 // ── Overview ─────────────────────────────────────────────────────────
-(function setGreeting(){
+let ownerName='';
+function setGreeting(){
   const h=parseInt(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Rome',hour:'numeric',hour12:false}).format(new Date()),10);
   let g;
-  if(h>=5 && h<12) g='Buongiorno, Owner';
-  else if(h>=12 && h<18) g='Buon pomeriggio, Owner';
-  else if(h>=18 && h<22) g='Buonasera, Owner';
-  else g='Buonanotte, Owner';
-  document.getElementById('dash-greeting').textContent=g;
-})();
+  if(h>=5 && h<12) g='Buongiorno';
+  else if(h>=12 && h<18) g='Buon pomeriggio';
+  else if(h>=18 && h<22) g='Buonasera';
+  else g='Buonanotte';
+  document.getElementById('dash-greeting').textContent=ownerName?`${g}, ${ownerName}`:g;
+}
+setGreeting();
 document.getElementById('dash-date').textContent=new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
 async function pollNow(){
@@ -996,7 +998,7 @@ async function refreshStatus(){
 // ── Threads ──────────────────────────────────────────────────────────
 const STAGE_MAP={
   'waiting_for_slots':                {cls:'b-await',label:'Awaiting your available slots'},
-  'waiting_for_owner_confirmation':{cls:'b-gius', label:'Awaiting your confirmation'},
+  'waiting_for_owner_confirmation':   {cls:'b-gius', label:'Awaiting your confirmation'},
   'waiting_for_confirmation':         {cls:'b-conf', label:'Awaiting their reply'},
   'waiting_booking_confirmation':     {cls:'b-book', label:'Awaiting booking confirmation'},
   'waiting_draft_approval':           {cls:'b-draft',label:'Draft pending your approval'},
@@ -1403,7 +1405,17 @@ async function exportExpensesZip(){try{const res=await fetch('/api/expenses/expo
 document.getElementById('expense-edit-modal').addEventListener('click',function(e){if(e.target===this)closeExpenseEdit();});
 
 // ── Settings ─────────────────────────────────────────────────────────
-async function loadConfig(){try{const c=await api('/api/config');const sel=document.getElementById('cfg-interval');if(sel)sel.value=c.pollIntervalMinutes||1;document.getElementById('cfg-instructions').value=c.instructions||'';document.getElementById('cfg-vdr-link').value=c.vdrLink||'';document.getElementById('cfg-vdr-info').value=c.vdrInfo||'';}catch(e){}}
+function applyBranding(c){
+  const org=(c&&c.orgName)||'';
+  ownerName=(c&&c.ownerName&&c.ownerName!=='the principal')?c.ownerName:'';
+  if(org){
+    document.title=`Clara · ${org}`;
+    const lo=document.getElementById('login-org'); if(lo)lo.textContent=org;
+    const hs=document.getElementById('header-sub'); if(hs)hs.textContent=`Operations Lead · ${org}`;
+  }
+  setGreeting();
+}
+async function loadConfig(){try{const c=await api('/api/config');applyBranding(c);const sel=document.getElementById('cfg-interval');if(sel)sel.value=c.pollIntervalMinutes||1;document.getElementById('cfg-instructions').value=c.instructions||'';document.getElementById('cfg-vdr-link').value=c.vdrLink||'';document.getElementById('cfg-vdr-info').value=c.vdrInfo||'';}catch(e){}}
 async function saveConfig(){try{await api('/api/config','POST',{pollIntervalMinutes:parseInt(document.getElementById('cfg-interval').value)||1,instructions:document.getElementById('cfg-instructions').value,vdrLink:document.getElementById('cfg-vdr-link').value.trim(),vdrInfo:document.getElementById('cfg-vdr-info').value.trim()});const msg=document.getElementById('cfg-save-msg');msg.textContent='✓ Saved';msg.classList.add('show');setTimeout(()=>msg.classList.remove('show'),2000);}catch(e){alert('Could not save: '+e.message);}}
 
 // ── Calendar ────────────────────────────────────────────────────────
